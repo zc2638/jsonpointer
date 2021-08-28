@@ -18,6 +18,7 @@ package jsonpointer
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -45,7 +46,7 @@ func getPointersData(rv reflect.Value, refs []string) (map[string]interface{}, e
 		refPaths := strings.Split(key, "/")
 		refData, err := getPointerData(rv, refPaths)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("path: %s, error: %s", ref, err)
 		}
 		result[ref] = refData
 	}
@@ -54,8 +55,7 @@ func getPointersData(rv reflect.Value, refs []string) (map[string]interface{}, e
 
 func getPointerData(rv reflect.Value, refPaths []string) (interface{}, error) {
 	if len(refPaths) == 0 {
-		// TODO 转结构指针返回
-		if rv.Kind() == reflect.Invalid { // TODO 转成对应默认值
+		if rv.Kind() == reflect.Invalid {
 			return nil, nil
 		}
 		return rv.Interface(), nil
