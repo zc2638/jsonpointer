@@ -55,8 +55,8 @@ func getPointersData(rv reflect.Value, refs []string) (map[string]interface{}, e
 
 func getPointerData(rv reflect.Value, refPaths []string) (interface{}, error) {
 	if len(refPaths) == 0 {
-		if rv.Kind() == reflect.Invalid {
-			return nil, nil
+		if !rv.CanInterface() {
+			return nil, errors.New("invalid value")
 		}
 		return rv.Interface(), nil
 	}
