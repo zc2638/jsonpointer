@@ -24,33 +24,55 @@ import (
 	"strings"
 )
 
-// GetPointersData 根据json-pointer组获取结构体下的结构指针
-func GetPointersData(data interface{}, refs []string) (map[string]interface{}, error) {
-	rv := reflect.ValueOf(data)
-	return getPointersData(rv, refs)
+type Parser struct {
+	rv *reflect.Value
 }
 
-func getPointersData(rv reflect.Value, refs []string) (map[string]interface{}, error) {
+func NewParser(data interface{}) (*Parser, error) {
+	rv := reflect.ValueOf(data)
 	switch rv.Type().Kind() {
 	case reflect.Ptr:
-		return getPointersData(rv.Elem(), refs)
 	case reflect.Slice:
 	case reflect.Map:
 	case reflect.Struct:
 	default:
 		return nil, errors.New("data type not support")
 	}
+	return &Parser{rv: &rv}, nil
+}
+
+func (p *Parser) Check(ref string) bool {
+	if _, err := p.Get(ref); err != nil {
+		return false
+	}
+	return true
+}
+
+func (p *Parser) Get(ref string) (interface{}, error) {
+	return getPointerData(*p.rv, refPaths(ref))
+}
+
+func (p *Parser) Batch(refs []string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	for _, ref := range refs {
-		key := strings.TrimPrefix(ref, "/")
-		refPaths := strings.Split(key, "/")
-		refData, err := getPointerData(rv, refPaths)
+		refData, err := getPointerData(*p.rv, refPaths(ref))
 		if err != nil {
+			// TODO 增加自定义error结构便于获取ref值
 			return nil, fmt.Errorf("path: %s, error: %s", ref, err)
 		}
 		result[ref] = refData
 	}
 	return result, nil
+}
+
+func refPaths(ref string) []string {
+	key := strings.TrimPrefix(ref, "/")
+	return strings.Split(key, "/")
+}
+
+func transferPointer(key string) string {
+	key = strings.ReplaceAll(key, "~1", "/")
+	return strings.ReplaceAll(key, "~0", "~")
 }
 
 func getPointerData(rv reflect.Value, refPaths []string) (interface{}, error) {
@@ -60,10 +82,7 @@ func getPointerData(rv reflect.Value, refPaths []string) (interface{}, error) {
 		}
 		return rv.Interface(), nil
 	}
-	key := refPaths[0]
-	// 处理 ~0 和 ~1 的转换
-	key = strings.ReplaceAll(key, "~1", "/")
-	key = strings.ReplaceAll(key, "~0", "~")
+	key := transferPointer(refPaths[0])
 	switch rv.Type().Kind() {
 	case reflect.Ptr:
 		if rv.IsNil() {
