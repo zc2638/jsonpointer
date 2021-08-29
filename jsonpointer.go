@@ -18,7 +18,6 @@ package jsonpointer
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -49,7 +48,11 @@ func (p *Parser) Check(ref string) bool {
 }
 
 func (p *Parser) Get(ref string) (interface{}, error) {
-	return getPointerData(*p.rv, refPaths(ref))
+	data, err := getPointerData(*p.rv, refPaths(ref))
+	if err != nil {
+		return nil, err.WithRef(ref)
+	}
+	return data, nil
 }
 
 func (p *Parser) Batch(refs []string) (map[string]interface{}, error) {
@@ -57,8 +60,7 @@ func (p *Parser) Batch(refs []string) (map[string]interface{}, error) {
 	for _, ref := range refs {
 		refData, err := getPointerData(*p.rv, refPaths(ref))
 		if err != nil {
-			// TODO 增加自定义error结构便于获取ref值
-			return nil, fmt.Errorf("path: %s, error: %s", ref, err)
+			return nil, err.WithRef(ref)
 		}
 		result[ref] = refData
 	}
@@ -75,10 +77,10 @@ func transferPointer(key string) string {
 	return strings.ReplaceAll(key, "~0", "~")
 }
 
-func getPointerData(rv reflect.Value, refPaths []string) (interface{}, error) {
+func getPointerData(rv reflect.Value, refPaths []string) (interface{}, *Error) {
 	if len(refPaths) == 0 {
 		if !rv.CanInterface() {
-			return nil, errors.New("invalid value")
+			return nil, NewError("invalid value")
 		}
 		return rv.Interface(), nil
 	}
@@ -86,29 +88,30 @@ func getPointerData(rv reflect.Value, refPaths []string) (interface{}, error) {
 	switch rv.Type().Kind() {
 	case reflect.Ptr:
 		if rv.IsNil() {
-			return nil, errors.New("ptr value is nil")
+			return nil, NewError("ptr value is nil")
 		}
 		return getPointerData(rv.Elem(), refPaths)
 	case reflect.Slice, reflect.Array:
 		if rv.IsNil() {
-			return nil, errors.New("array/slice value is nil")
+			return nil, NewError("array/slice value is nil")
 		}
 		i, err := strconv.Atoi(key)
 		if err != nil {
-			return nil, errors.New("not a valid array index")
+			return nil, NewError("not a valid array index")
 		}
 		if i >= rv.Len() {
-			return nil, errors.New("index out of range")
+			return nil, NewError("index out of range")
 		}
 		return getPointerData(rv.Index(i), refPaths[1:])
 	case reflect.Map:
 		if rv.IsNil() {
-			return nil, errors.New("map value is nil")
+			return nil, NewError("map value is nil")
 		}
 		value := rv.MapIndex(reflect.ValueOf(key))
 		if value.Kind() == reflect.Invalid {
 			valT := rv.Type().Elem()
 			value = reflect.New(valT).Elem()
+			return nil, NewError("map key not exits").WithDefault(value.Interface())
 		}
 		return getPointerData(value, refPaths[1:])
 	case reflect.Struct:
@@ -123,8 +126,8 @@ func getPointerData(rv reflect.Value, refPaths []string) (interface{}, error) {
 			}
 			return getPointerData(rv.Field(i), refPaths[1:])
 		}
-		return nil, errors.New("field mismatch")
+		return nil, NewError("field mismatch")
 	default:
-		return nil, errors.New("type mismatch")
+		return nil, NewError("type mismatch")
 	}
 }
