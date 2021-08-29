@@ -31,6 +31,7 @@ type Data struct {
 }
 
 func main() {
+    line := 5
     data := Test{
         Name: "张三",
         Children: []Child{
@@ -52,6 +53,9 @@ func main() {
     if err != nil {
         log.Fatal(err)	
     }
+    
+    exists := parser.Check("/children/0/age")
+    fmt.Printf("path exists: %s\n", exists)e
     
     value, err := parser.Get("/children/0/age")
     if err != nil {
