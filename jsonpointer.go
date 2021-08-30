@@ -119,7 +119,7 @@ func getPointerData(rv reflect.Value, refPaths []string) (interface{}, *Error) {
 			field := rv.Type().Field(i)
 			current, ok := field.Tag.Lookup("json")
 			if !ok {
-				continue
+				current = field.Name
 			}
 			if current != key {
 				continue
