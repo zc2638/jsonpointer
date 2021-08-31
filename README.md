@@ -55,7 +55,7 @@ func main() {
     }
     
     exists := parser.Check("/children/0/age")
-    fmt.Printf("path exists: %s\n", exists)e
+    fmt.Printf("path exists: %v\n", exists)
     
     value, err := parser.Get("/children/0/age")
     if err != nil {
